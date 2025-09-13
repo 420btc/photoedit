@@ -1,0 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Bowlby+One&display=swap');
+
+/* Apply Bowlby One font to headings and important text */
+h1, h2, h3, .font-bowlby {
+  font-family: 'Bowlby One', cursive;
+}
+
+/* Ensure body has a fallback font */
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+}

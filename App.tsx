@@ -14,6 +14,7 @@ import AdjustmentPanel from './components/AdjustmentPanel';
 import CropPanel from './components/CropPanel';
 import { UndoIcon, RedoIcon, EyeIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
+import AuthScreen from './components/AuthScreen';
 
 // Helper to convert a data URL string to a File object
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -48,6 +49,8 @@ const App: React.FC = () => {
   const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
   const [aspect, setAspect] = useState<number | undefined>();
   const [isComparing, setIsComparing] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
   const currentImage = history[historyIndex] ?? null;
@@ -94,28 +97,42 @@ const App: React.FC = () => {
 
   const handleImageUpload = useCallback((file: File) => {
     setError(null);
-    setHistory([file]);
-    setHistoryIndex(0);
-    setEditHotspot(null);
-    setDisplayHotspot(null);
-    setActiveTab('retouch');
-    setCrop(undefined);
-    setCompletedCrop(undefined);
+    setPendingImage(file);
+    setIsAuthenticated(false);
+  }, []);
+
+  const handleAuthenticated = useCallback(() => {
+    if (pendingImage) {
+      setHistory([pendingImage]);
+      setHistoryIndex(0);
+      setEditHotspot(null);
+      setDisplayHotspot(null);
+      setActiveTab('retouch');
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+      setIsAuthenticated(true);
+      setPendingImage(null);
+    }
+  }, [pendingImage]);
+
+  const handleAuthBack = useCallback(() => {
+    setPendingImage(null);
+    setIsAuthenticated(false);
   }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!currentImage) {
-      setError('No image loaded to edit.');
+      setError('No hay imagen cargada para editar.');
       return;
     }
     
     if (!prompt.trim()) {
-        setError('Please enter a description for your edit.');
+        setError('Por favor ingresa una descripción para tu edición.');
         return;
     }
 
     if (!editHotspot) {
-        setError('Please click on the image to select an area to edit.');
+        setError('Por favor haz clic en la imagen para seleccionar un área a editar.');
         return;
     }
 
@@ -130,7 +147,7 @@ const App: React.FC = () => {
         setDisplayHotspot(null);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(`Failed to generate the image. ${errorMessage}`);
+        setError(`Error al generar la imagen. ${errorMessage}`);
         console.error(err);
     } finally {
         setIsLoading(false);
@@ -139,7 +156,7 @@ const App: React.FC = () => {
   
   const handleApplyFilter = useCallback(async (filterPrompt: string) => {
     if (!currentImage) {
-      setError('No image loaded to apply a filter to.');
+      setError('No hay imagen cargada para aplicar un filtro.');
       return;
     }
     
@@ -152,7 +169,7 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(`Failed to apply the filter. ${errorMessage}`);
+        setError(`Error al aplicar el filtro. ${errorMessage}`);
         console.error(err);
     } finally {
         setIsLoading(false);
@@ -161,7 +178,7 @@ const App: React.FC = () => {
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
     if (!currentImage) {
-      setError('No image loaded to apply an adjustment to.');
+      setError('No hay imagen cargada para aplicar un ajuste.');
       return;
     }
     
@@ -174,7 +191,7 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(`Failed to apply the adjustment. ${errorMessage}`);
+        setError(`Error al aplicar el ajuste. ${errorMessage}`);
         console.error(err);
     } finally {
         setIsLoading(false);
@@ -183,7 +200,7 @@ const App: React.FC = () => {
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
-        setError('Please select an area to crop.');
+        setError('Por favor selecciona un área para recortar.');
         return;
     }
 
@@ -197,7 +214,7 @@ const App: React.FC = () => {
     const ctx = canvas.getContext('2d');
 
     if (!ctx) {
-        setError('Could not process the crop.');
+        setError('No se pudo procesar el recorte.');
         return;
     }
 
@@ -257,6 +274,8 @@ const App: React.FC = () => {
       setPrompt('');
       setEditHotspot(null);
       setDisplayHotspot(null);
+      setIsAuthenticated(false);
+      setPendingImage(null);
   }, []);
 
   const handleDownload = useCallback(() => {
@@ -302,16 +321,26 @@ const App: React.FC = () => {
     if (error) {
        return (
            <div className="text-center animate-fade-in bg-red-500/10 border border-red-500/20 p-8 rounded-lg max-w-2xl mx-auto flex flex-col items-center gap-4">
-            <h2 className="text-2xl font-bold text-red-300">An Error Occurred</h2>
+            <h2 className="text-2xl font-bold text-red-300 font-bowlby">Ocurrió un Error</h2>
             <p className="text-md text-red-400">{error}</p>
             <button
                 onClick={() => setError(null)}
-                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg text-md transition-colors"
+                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg text-md transition-colors font-bowlby"
               >
-                Try Again
+                Intentar de Nuevo
             </button>
           </div>
         );
+    }
+    
+    // Show authentication screen if image is uploaded but not authenticated
+    if (pendingImage && !isAuthenticated) {
+      return (
+        <AuthScreen 
+          onAuthenticated={handleAuthenticated}
+          onBack={handleAuthBack}
+        />
+      );
     }
     
     if (!currentImageUrl) {
@@ -412,16 +441,16 @@ const App: React.FC = () => {
                             type="text"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={editHotspot ? "e.g., 'change my shirt color to blue'" : "First click a point on the image"}
+                            placeholder={editHotspot ? "ej., 'cambia el color de mi camisa a azul'" : "Primero haz clic en un punto de la imagen"}
                             className="flex-grow bg-gray-800 border border-gray-700 text-gray-200 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
                             disabled={isLoading || !editHotspot}
                         />
                         <button 
                             type="submit"
-                            className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
+                            className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none font-bowlby"
                             disabled={isLoading || !prompt.trim() || !editHotspot}
                         >
-                            Generate
+                            Generar
                         </button>
                     </form>
                 </div>
@@ -439,7 +468,7 @@ const App: React.FC = () => {
                 aria-label="Undo last action"
             >
                 <UndoIcon className="w-5 h-5 mr-2" />
-                Undo
+                Deshacer
             </button>
             <button 
                 onClick={handleRedo}
@@ -448,7 +477,7 @@ const App: React.FC = () => {
                 aria-label="Redo last action"
             >
                 <RedoIcon className="w-5 h-5 mr-2" />
-                Redo
+                Rehacer
             </button>
             
             <div className="h-6 w-px bg-gray-600 mx-1 hidden sm:block"></div>
@@ -464,7 +493,7 @@ const App: React.FC = () => {
                   aria-label="Press and hold to see original image"
               >
                   <EyeIcon className="w-5 h-5 mr-2" />
-                  Compare
+                  Comparar
               </button>
             )}
 
@@ -473,20 +502,20 @@ const App: React.FC = () => {
                 disabled={!canUndo}
                 className="text-center bg-transparent border border-white/20 text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-white/10 hover:border-white/30 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
               >
-                Reset
+                Reiniciar
             </button>
             <button 
                 onClick={handleUploadNew}
                 className="text-center bg-white/10 border border-white/20 text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-white/20 hover:border-white/30 active:scale-95 text-base"
             >
-                Upload New
+                Subir Nueva
             </button>
 
             <button 
                 onClick={handleDownload}
                 className="flex-grow sm:flex-grow-0 ml-auto bg-gradient-to-br from-green-600 to-green-500 text-white font-bold py-3 px-5 rounded-md transition-all duration-300 ease-in-out shadow-lg shadow-green-500/20 hover:shadow-xl hover:shadow-green-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base"
             >
-                Download Image
+                Descargar Imagen
             </button>
         </div>
       </div>
